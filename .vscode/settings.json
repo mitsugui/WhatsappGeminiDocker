@@ -1,0 +1,14 @@
+{
+    "containerApps.deploymentConfigurations": [
+        {
+            "label": "WhatsappGeminiDocker",
+            "type": "AcrDockerBuildRequest",
+            "dockerfilePath": "Dockerfile",
+            "srcPath": ".",
+            "envPath": "",
+            "resourceGroup": "WhatsappGeminiDocker",
+            "containerApp": "WhatsappGeminiDocker",
+            "containerRegistry": "WhatsappGeminiDocker11c25a"
+        }
+    ]
+}
