@@ -10,12 +10,16 @@ Este exemplo segue os mesmos princípios explicados nesse [tutorial para AWS](ht
 
 No site da Meta para desenvolvedores, abra seus [Apps](https://developers.facebook.com/apps) selecione o app que você criou e na guia "Configuração da API" gere um token "Gerar token de acesso".
 
-Configure um webhook informando a URL da aplicação (por exemplo, https://meuapp.azurewebsites.net/HttpEcho) e informe uma palavra chave (ex.: minhachavesecreta) qualquer que será usada para validação. Ative o campo do tipo **messages** (Deve ficar marcado como Assinado)
+Configure um webhook informando a URL da aplicação (por exemplo, https://meuapp.azurecontainerapps.io/Chat) e informe uma palavra chave (ex.: minhachavesecreta) qualquer que será usada para validação. Ative o campo do tipo **messages** (Deve ficar marcado como Assinado)
 
-Configure as seguintes variáveis de ambiente:
+Configura uma chave de API para acesso ao [Gemini](https://aistudio.google.com/prompts/new_chat) clicando em "Get API Key" e copie a chave gerada.
 
-`Whatsapp__VERIFY_TOKEN: minhachavesecreta` (ou outra palavra chave escolhida)
+Configure as seguintes variáveis no appsettings.json ou defina variáveis de ambiente equivalentes:
 
-`Whatsapp__ACCESS_TOKEN: EAA...xxx` (token gerado no portal do desenvolvedor)
+`Whatsapp:VERIFY_TOKEN: minhachavesecreta` (ou outra palavra chave escolhida)
+
+`Whatsapp:ACCESS_TOKEN: EAA...xxx` (token gerado no portal do desenvolvedor)
+
+`Gemini:API_KEY: AI...xxx` (chave gerada no Gemini)
 
 Existem alguns testes no arquivo Tests.http
