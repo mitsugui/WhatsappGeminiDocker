@@ -6,6 +6,8 @@ namespace WhatsappGeminiDocker;
 
 public static class Endpoints
 {
+    private const string GeminiSystemInstructions = "Como um bom amigo na faixa dos 30 anos de idade, responda as perguntas e faça comentários sobre afirmações de maneira informal e com frases curtas como respostas de um bate papo no whatsapp."; // Substitua pelas instruções do sistema
+
     internal static void MapGetChat(this WebApplication app)
     {
         app.MapGet("/Chat", (
@@ -47,6 +49,13 @@ public static class Endpoints
                 return Results.StatusCode(500); // Internal Server Error if tokens are missing.
             }
 
+            var gemini = config.GetSection("Gemini").Get<GeminiKey>();
+            if (gemini == null || string.IsNullOrEmpty(gemini.API_KEY))
+            {
+                logger.LogError("Gemini key is not configured correctly.");
+                return Results.StatusCode(500); // Internal Server Error if key is missing.
+            }
+
             using var reader = new StreamReader(context.Request.Body);
             var requestBody = await reader.ReadToEndAsync();
             dynamic? body = JsonConvert.DeserializeObject(requestBody);
@@ -77,8 +86,9 @@ public static class Endpoints
 
                         var from = message.from.ToString();
                         var messageBody = message?.text?.body;
-                        var replyMessage = $"Ack from Azure Function: {messageBody}";
+
                         logger.LogInformation($"Phone Number: {phoneNumberId} Message: {from} | Body: {messageBody}.");
+                        var replyMessage = await SendToGemini(messageBody?.ToString(), gemini, httpClientFactory, logger);
 
                         await SendReply(phoneNumberId, from, replyMessage, whatsappTokens.ACCESS_TOKEN, httpClientFactory, logger);
                         return Results.Ok(); // Acknowledge each message individually.  Critical for avoiding infinite loops.
@@ -90,22 +100,50 @@ public static class Endpoints
         });
     }
 
+    public static void MapPostTest(this WebApplication app)
+    {
+        app.MapPost("/Test", async (
+            [FromBody] string message,
+            IConfiguration config,
+            IHttpClientFactory httpClientFactory, // Inject IHttpClientFactory
+            ILogger<Program> logger) =>
+        {
+            logger.LogInformation("C# HTTP POST trigger function processed a request.");
+
+            var gemini = config.GetSection("Gemini").Get<GeminiKey>(); // Get Gemini key from config
+            if (gemini == null || string.IsNullOrEmpty(gemini.API_KEY))
+            {
+                logger.LogError("Gemini key is not configured correctly.");
+                return Results.StatusCode(500); // Internal Server Error if key is missing.
+            }
+
+            var response = await SendToGemini(message, gemini, httpClientFactory, logger);
+            return Results.Ok(response);
+        });
+    }
+
     private static async Task<string> SendToGemini(string message, GeminiKey gemini, IHttpClientFactory httpClientFactory, ILogger logger)
     {
-        const string SYSTEM_INSTRUCTIONS = "Instruções do sistema para o Gemini"; // Substitua pelas instruções do sistema
-
         var json = new
         {
-            instructions = SYSTEM_INSTRUCTIONS,
-            message = message
+            system_instruction = new
+            {
+                parts = new { text = GeminiSystemInstructions }
+            },
+            contents = new[]
+            {
+                new
+                {
+                    parts = new[] { new { text = message } }
+                }
+            }
         };
 
         var serializedData = JsonConvert.SerializeObject(json);
         var data = new StringContent(serializedData, Encoding.UTF8, "application/json");
-        var url = "https://api.gemini.com/v1/messages"; // Substitua pela URL correta da API do Gemini
+        var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini.API_KEY}";
 
         var client = httpClientFactory.CreateClient();
-        client.DefaultRequestHeaders.Add("Authorization", $"Bearer {gemini.API_KEY}");
 
         try
         {
@@ -116,8 +154,14 @@ public static class Endpoints
             if (response.IsSuccessStatusCode)
             {
                 var responseContent = await response.Content.ReadAsStringAsync();
+                if (responseContent == null) return string.Empty;
+
                 logger.LogInformation($"Response from Gemini: {responseContent}");
-                return responseContent;
+
+                dynamic? jsonResponse = JsonConvert.DeserializeObject(responseContent);
+                var textContent = jsonResponse?.candidates[0]?.content?.parts[0]?.text;
+
+                return textContent ?? string.Empty;
             }
             else
             {

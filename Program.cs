@@ -25,4 +25,6 @@ app.MapGetChat();
 
 app.MapPostChat();
 
+app.MapPostTest();
+
 app.Run();
