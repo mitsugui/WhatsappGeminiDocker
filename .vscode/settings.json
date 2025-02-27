@@ -6,9 +6,9 @@
             "dockerfilePath": "Dockerfile",
             "srcPath": ".",
             "envPath": "",
-            "resourceGroup": "WhatsappGeminiDocker",
-            "containerApp": "WhatsappGeminiDocker",
-            "containerRegistry": "WhatsappGeminiDocker11c25a"
+            "resourceGroup": "whatsappgeminidocker",
+            "containerApp": "whatsappgeminidocker",
+            "containerRegistry": "whatsappgeminidocker19ee06"
         }
     ]
 }
