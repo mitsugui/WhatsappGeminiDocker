@@ -1,0 +1,90 @@
+
+@palavrachavewhatsapp = xxx
+@challenge = xxx
+@mensagemwhatsapp = "Uma outra mensagem de teste do whatsapp"
+@tokenDeAcessoWhatsapp = EAA...
+@numeroDeTelefoneWhatsapp = "5511XXXXXXXX"
+@whatsappPhoneId = "000000000000000"
+@geminiApiKey = AI..
+
+
+### Teste local da mensagem de challenge
+GET https://localhost:7297/Chat?hub.mode=subscribe&hub.challenge={{challenge}}&hub.verify_token={{palavrachavewhatsapp}} HTTP/1.1
+
+
+### Teste de envio de mensagem de whatsapp. Ao iniciar uma conversa só é possível enviar mensagens de template
+
+POST https://graph.facebook.com/v22.0/{{whatsappPhoneId}}/messages?access_token={{tokenDeAcessoWhatsapp}} HTTP/1.1
+Content-Type: application/json
+
+{ "messaging_product": "whatsapp", "to": {{numeroDeTelefoneWhatsapp}}, "type": "template", "template": { "name": "hello_world", "language": { "code": "en_US" } } }
+
+### Teste local  de envio de mensagem de whatsapp
+
+
+POST https://whatsappgeminidocker.victorioushill-ece06284.brazilsouth.azurecontainerapps.io/Chat?hub.mode=subscribe&hub.challenge={{challenge}}&hub.verify_token={{palavrachavewhatsapp}} HTTP/1.1
+Content-Type: application/json
+
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "<WHATSAPP_BUSINESS_ACCOUNT_ID>",
+      "changes": [
+        {
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "display_phone_number": "<WHATSAPP_BUSINESS_ACCOUNT_PHONE_NUMBER>",
+              "phone_number_id": {{whatsappPhoneId}}
+            },
+            "contacts": [
+              {
+                "profile": {
+                  "name": "<Nome do contato>"
+                },
+                "wa_id": "<WHATSAPP_USER_ID>"
+              }
+            ],
+            "messages": [
+              {
+                "from": {{numeroDeTelefoneWhatsapp}},
+                "id": "<WHATSAPP_MESSAGE_ID>",
+                "timestamp": "<WEBHOOK_SENT_TIMESTAMP>",
+                "text": {
+                  "body": {{mensagemwhatsapp}}
+                },
+                "type": "text"
+              }
+            ]
+          },
+          "field": "messages"
+        }
+      ]
+    }
+  ]
+}
+
+### Teste de acesso direto ao Gemini
+
+POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={{geminiApiKey}} HTTP/1.1
+Content-Type: application/json
+
+{
+  "system_instruction": {
+    "parts": { 
+      "text": "Como um bom amigo na faixa dos 30 anos de idade, responda as perguntas e faça comentários sobre afirmações de maneira informal e com frases curtas como respostas de um bate papo no whatsapp."
+      }},
+  "contents": [
+    {
+      "parts":[{"text": "Explain how AI works"}]
+    }
+  ]
+}
+
+### Teste da api acessando Gemini direto
+
+POST https://localhost:7297/Test HTTP/1.1
+Content-Type: application/json
+
+"Estou falando com o Gemini?"
