@@ -1,4 +1,4 @@
-namespace WhatsappGeminiDocker.Services.Whatsapp;
+namespace WhatsappGeminiDocker.Servicos.Whatsapp;
 
 public class WhatsappTokens
 {

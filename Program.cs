@@ -1,6 +1,6 @@
 using WhatsappGeminiDocker;
-using WhatsappGeminiDocker.Services.Gemini;
-using WhatsappGeminiDocker.Services.Whatsapp;
+using WhatsappGeminiDocker.Servicos.Gemini;
+using WhatsappGeminiDocker.Servicos.Whatsapp;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,7 +16,8 @@ builder.Services.AddHttpClient(); // Add HttpClient
 builder.Services.Configure<WhatsappTokens>(
     builder.Configuration.GetSection("Whatsapp"));
 
-builder.Services.AddScoped<GeminiService>(); // Add GeminiService
+builder.Services.AddScoped<ServicoWhatsapp>();
+builder.Services.AddScoped<ServicoGemini>();
 
 var app = builder.Build();
 
