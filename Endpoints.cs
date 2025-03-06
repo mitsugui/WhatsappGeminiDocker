@@ -2,14 +2,13 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
+using WhatsappGeminiDocker.Services.Gemini;
+using WhatsappGeminiDocker.Services.Whatsapp;
 
 namespace WhatsappGeminiDocker;
 
 public static class Endpoints
 {
-    private const string GeminiSystemInstructions = "Como um bom amigo na faixa dos 30 anos de idade, responda as perguntas e faça comentários sobre afirmações de maneira informal e com frases curtas como respostas de um bate papo no whatsapp."; // Substitua pelas instruções do sistema
-
     internal static void MapGetChat(this WebApplication app)
     {
         app.MapGet("/Chat", (
@@ -40,7 +39,8 @@ public static class Endpoints
             HttpContext context,
             IConfiguration config,
             IHttpClientFactory httpClientFactory, // Inject IHttpClientFactory
-            ILogger<Program> logger) =>
+            ILogger<Program> logger,
+            GeminiService geminiService) =>
         {
             logger.LogInformation("C# HTTP POST trigger function processed a request.");
 
@@ -49,13 +49,6 @@ public static class Endpoints
             {
                 logger.LogError("Whatsapp tokens are not configured correctly.");
                 return Results.StatusCode(500); // Internal Server Error if tokens are missing.
-            }
-
-            var gemini = config.GetSection("Gemini").Get<GeminiKey>();
-            if (gemini == null || string.IsNullOrEmpty(gemini.API_KEY))
-            {
-                logger.LogError("Gemini key is not configured correctly.");
-                return Results.StatusCode(500); // Internal Server Error if key is missing.
             }
 
             // Use System.Text.Json for deserialization.
@@ -93,7 +86,8 @@ public static class Endpoints
                         var messageBody = message?.Text?.Body;
 
                         logger.LogInformation($"Phone Number: {phoneNumberId} Message: {from} | Body: {messageBody}.");
-                        var replyMessage = await SendToGemini(messageBody, gemini, httpClientFactory, logger);
+                        var (result, replyMessage) = await geminiService.SendToGemini(messageBody);
+                        if (result != Results.Ok()) return result;
 
                         if (phoneNumberId == null || from == null || replyMessage == null) continue;
 
@@ -113,85 +107,14 @@ public static class Endpoints
     {
         app.MapPost("/Test", async (
             [FromBody] string message, // System.Text.Json can bind simple strings from the body.
-            IConfiguration config,
-            IHttpClientFactory httpClientFactory,
-            ILogger<Program> logger) =>
+            ILogger<Program> logger,
+            GeminiService geminiService) =>
         {
             logger.LogInformation("C# HTTP POST trigger function processed a request.");
 
-            var gemini = config.GetSection("Gemini").Get<GeminiKey>();
-            if (gemini == null || string.IsNullOrEmpty(gemini.API_KEY))
-            {
-                logger.LogError("Gemini key is not configured correctly.");
-                return Results.StatusCode(500);
-            }
-
-            var response = await SendToGemini(message, gemini, httpClientFactory, logger);
-            return Results.Ok(response); // Return the response string directly.
+            var (result, text) = await geminiService.SendToGemini(message);
+            return result == Results.Ok() ? Results.Ok(text) : result;
         });
-    }
-
-
-    private static async Task<string> SendToGemini(string? message, GeminiKey gemini, IHttpClientFactory httpClientFactory,
-        ILogger logger)
-    {
-        // Use anonymous types for the JSON structure.  System.Text.Json handles this well.
-        var json = new
-        {
-            system_instruction = new
-            {
-                parts = new[] { new { text = GeminiSystemInstructions } }
-            },
-            contents = new[]
-            {
-                new
-                {
-                    parts = new[] { new { text = message ?? string.Empty } } // Handle null message
-                }
-            }
-        };
-
-        // Use System.Text.Json for serialization.
-        var serializedData = JsonSerializer.Serialize(json);
-        var data = new StringContent(serializedData, Encoding.UTF8, "application/json");
-        var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini.API_KEY}";
-
-        var client = httpClientFactory.CreateClient();
-
-        try
-        {
-            logger.LogInformation($"Url: {url}.");
-            logger.LogInformation($"Data: {serializedData}.");
-
-            var response = await client.PostAsync(url, data);
-            if (response.IsSuccessStatusCode)
-            {
-                // Use System.Text.Json to deserialize the response.
-                var responseContent = await response.Content.ReadFromJsonAsync<GeminiResponse>();
-
-                if (responseContent == null || responseContent.Candidates == null || responseContent.Candidates.Count == 0)
-                {
-                    logger.LogWarning("Gemini returned an empty or invalid response.");
-                    return string.Empty;
-                }
-
-                logger.LogInformation($"Response from Gemini: {JsonSerializer.Serialize(responseContent)}");
-
-                var textContent = responseContent?.Candidates?[0]?.Content?.Parts?[0]?.Text;
-                return textContent ?? string.Empty;
-            }
-            else
-            {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                logger.LogError($"Error sending to Gemini: {response.StatusCode} - {errorContent}");
-                return string.Empty;
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.LogError($"Exception sending to Gemini: {ex.Message}");
-            return string.Empty;
-        }
     }
 
 
@@ -321,66 +244,5 @@ public static class Endpoints
         public string? Timestamp { get; set; }
         [JsonPropertyName("recipient_id")]
         public string? RecipientId { get; set; }
-    }
-
-    public class GeminiResponse
-    {
-        [JsonPropertyName("candidates")]
-        public List<Candidate>? Candidates { get; set; }
-
-        [JsonPropertyName("promptFeedback")]
-        public PromptFeedback? PromptFeedback { get; set; }
-    }
-
-    public class Candidate
-    {
-        [JsonPropertyName("content")]
-        public Content? Content { get; set; }
-
-        [JsonPropertyName("finishReason")]
-        public string? FinishReason { get; set; }
-
-        [JsonPropertyName("index")]
-        public int? Index { get; set; }
-
-        [JsonPropertyName("safetyRatings")]
-        public List<SafetyRating>? SafetyRatings { get; set; }
-    }
-
-    public class Content
-    {
-        [JsonPropertyName("parts")]
-        public List<Part>? Parts { get; set; }
-
-        [JsonPropertyName("role")]
-        public string? Role { get; set; }
-    }
-
-    public class Part
-    {
-        [JsonPropertyName("text")]
-        public string? Text { get; set; }
-    }
-
-    public class SafetyRating
-    {
-        [JsonPropertyName("category")]
-        public string? Category { get; set; }
-
-        [JsonPropertyName("probability")]
-        public string? Probability { get; set; }
-    }
-
-    public class PromptFeedback
-    {
-        [JsonPropertyName("blockReason")]
-        public string? BlockReason { get; set; }
-        [JsonPropertyName("safetyRatings")]
-        public List<SafetyRating>? SafetyRatings { get; set; }
-    }
-
-    class GeminiKey
-    {
-        public string? API_KEY { get; set; }
     }
 }
